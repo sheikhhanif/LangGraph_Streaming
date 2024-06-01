@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QnA: The Hague</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f7f7f7;
+            margin: 0;
+            padding: 0;
+        }
+        .chat-container {
+            width: 80%;
+            max-width: 800px;
+            margin: 50px auto;
+            background-color: #fff;
+            border-radius: 20px;
+            box-shadow: 0px 0px 20px 0px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 80vh;
+        }
+        .chat-header {
+            background-color: #6c63ff;
+            color: #fff;
+            padding: 15px;
+            font-weight: bold;
+            text-align: center;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+        }
+        .chat-messages {
+            padding: 15px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        .message-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+        }
+        .message {
+            border-radius: 20px;
+            padding: 10px;
+            max-width: 70%;
+            position: relative;
+        }
+        .message.bot {
+            background-color: #e0e0e0;
+            align-self: flex-start;
+        }
+        .message.user {
+            background-color: #6c63ff;
+            color: #fff;
+            align-self: flex-end;
+        }
+        .chat-input {
+            padding: 10px;
+            background-color: #fff;
+            border-top: 1px solid #ccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+        }
+        .chat-input input[type="text"] {
+            flex: 1;
+            border: none;
+            padding: 10px;
+            border-radius: 20px;
+            margin-right: 10px;
+            outline: none;
+        }
+        .chat-input button {
+            border: none;
+            padding: 10px 20px;
+            background: #6c63ff;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 20px;
+            font-size: 14px;
+            outline: none;
+        }
+        .feedback-buttons {
+            display: flex;
+            gap: 2px;
+            justify-content: center;
+            margin-top: 2px;
+        }
+        .feedback-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 10px;
+        }
+        .feedback-button {
+            background-color: #f0f0f0;
+            border: none;
+            padding: 3px 5px;
+            margin: 3px;
+            cursor: pointer;
+            border-radius: 6px;
+        }
+        .feedback-container {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .comment-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-top: 5px;
+        }
+        .comment-input {
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 5px;
+            outline: none;
+        }
+        .comment-button {
+            background-color: #6c63ff;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 5px;
+            cursor: pointer;
+            font-size: 10px;
+        }
+        .typing-indicator {
+            color: #888;
+            margin-left: 3px;
+            overflow: hidden;
+            width: 3em;
+            white-space: nowrap;
+            margin-bottom: 3px;
+            animation: typing 1s steps(6, end) infinite;
+        }
+        @keyframes typing {
+            from {
+                width: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chat-container">
+            <div class="chat-header">QnA: The Hague</div>
+            <div class="chat-messages" id="messages">
+                <!-- Messages will be displayed here -->
+            </div>
+            <div class="chat-input">
+                <input type="text" id="messageText" autocomplete="off" placeholder="Type a message..." class="form-control" />
+                <button onclick="sendMessage()" class="btn btn-primary">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var ws = new WebSocket("ws://localhost:8000/ws");
+        var messages = document.getElementById('messages');
+        var botMessageBuffer = '';
+        var lastUserMessage = '';
+        var activeCommentContainer = null;
+
+        ws.onmessage = function(event) {
+            if (event.data.startsWith('__feedback__')) {
+                // The message is complete, add feedback buttons
+                var botMessage = event.data.replace('__feedback__', '');
+                removeTypingIndicator();
+                appendMessage(botMessage, 'bot');
+                addFeedbackButtons(messages.lastElementChild, botMessageBuffer, lastUserMessage);
+                botMessageBuffer = '';
+            } else {
+                // Stream bot message
+                removeTypingIndicator();
+                botMessageBuffer += event.data;
+                appendMessage(event.data, 'bot');
+            }
+        };
+
+        function appendMessage(message, className) {
+            var lastMessageContainer = messages.lastElementChild;
+            if (lastMessageContainer && lastMessageContainer.classList.contains('message-container') && lastMessageContainer.lastElementChild.classList.contains(className)) {
+                lastMessageContainer.lastElementChild.innerText += ' ' + message;
+            } else {
+                var messageContainer = document.createElement('div');
+                messageContainer.className = 'message-container';
+
+                var newMessage = document.createElement('div');
+                newMessage.className = 'message ' + className;
+                newMessage.innerText = message;
+
+                messageContainer.appendChild(newMessage);
+                messages.appendChild(messageContainer);
+            }
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function sendMessage() {
+            var input = document.getElementById("messageText");
+            var message = input.value.trim();
+            if (message) {
+                appendMessage(message, 'user');
+                lastUserMessage = message;
+                ws.send(message);
+                input.value = '';
+                addTypingIndicator();
+            }
+        }
+
+        function addTypingIndicator() {
+            var typingIndicator = document.createElement('div');
+            typingIndicator.className = 'message-container';
+            typingIndicator.id = 'typingIndicator';
+
+            var indicatorMessage = document.createElement('div');
+            indicatorMessage.className = 'message bot typing-indicator';
+            indicatorMessage.innerText = 'Typing.....';
+
+            typingIndicator.appendChild(indicatorMessage);
+            messages.appendChild(typingIndicator);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            var typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        function sendFeedback(userMessage, botMessage, feedback, comment = '') {
+            fetch('/feedback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ user_message: userMessage, bot_message: botMessage, feedback: feedback, comment: comment })
+            });
+        }
+
+        function addFeedbackButtons(messageContainer, botMessage, userMessage) {
+            var feedbackContainer = document.createElement('div');
+            feedbackContainer.className = 'feedback-container';
+
+            var feedbackButtons = document.createElement('div');
+            feedbackButtons.className = 'feedback-buttons';
+
+            var thumbsUp = document.createElement('button');
+            thumbsUp.className = 'feedback-button';
+            thumbsUp.innerText = '👍';
+            thumbsUp.onclick = function() { 
+                sendFeedback(userMessage, botMessage, 'up');
+                thumbsUp.style.backgroundColor = 'green'; // Change color to green
+                thumbsDown.style.backgroundColor = ''; // Reset color of the other button
+            };
+
+            var thumbsDown = document.createElement('button');
+            thumbsDown.className = 'feedback-button';
+            thumbsDown.innerText = '👎';
+            thumbsDown.onclick = function() { 
+                sendFeedback(userMessage, botMessage, 'down');
+                thumbsDown.style.backgroundColor = 'green'; // Change color to green
+                thumbsUp.style.backgroundColor = ''; // Reset color of the other button
+            };
+
+            var commentButton = document.createElement('button');
+            commentButton.className = 'feedback-button';
+            commentButton.innerText = '💬';
+            commentButton.onclick = function() { 
+                showCommentInput(messageContainer, userMessage, botMessage); 
+            };
+
+            feedbackButtons.appendChild(thumbsUp);
+            feedbackButtons.appendChild(thumbsDown);
+            feedbackButtons.appendChild(commentButton);
+
+            feedbackContainer.appendChild(feedbackButtons);
+            messageContainer.appendChild(feedbackContainer); // Append feedback container after the bot message
+        }
+
+        function showCommentInput(messageContainer, userMessage, botMessage) {
+            if (activeCommentContainer) {
+                activeCommentContainer.remove();
+            }
+
+            var commentContainer = document.createElement('div');
+            commentContainer.className = 'comment-container';
+
+            var commentInput = document.createElement('input');
+            commentInput.className = 'comment-input';
+            commentInput.type = 'text';
+            commentInput.placeholder = 'Type your comment...';
+
+            var sendCommentButton = document.createElement('button');
+            sendCommentButton.className = 'comment-button';
+            sendCommentButton.innerText = 'Send';
+            sendCommentButton.onclick = function() {
+                var comment = commentInput.value.trim();
+                if (comment) {
+                    sendFeedback(userMessage, botMessage, comment);
+                    commentContainer.remove();
+                    activeCommentContainer = null;
+                }
+            };
+
+            commentContainer.appendChild(commentInput);
+            commentContainer.appendChild(sendCommentButton);
+            messageContainer.appendChild(commentContainer);
+
+            activeCommentContainer = commentContainer;
+
+            setTimeout(function() {
+                document.addEventListener('click', handleClickOutside);
+            }, 0);
+
+            function handleClickOutside(event) {
+                if (activeCommentContainer && !commentContainer.contains(event.target)) {
+                    commentContainer.remove();
+                    activeCommentContainer = null;
+                    document.removeEventListener('click', handleClickOutside);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
+
