@@ -6,3 +6,5 @@ This repository contains a powerful API service leveraging the capabilities of L
 - Streaming Tokens: Enables real-time ChatGPT-like word streaming (not token streaming; tokens are converted to words before displaying in the webUI).
 - Websocket: Utilizes the Websocket protocol for real-time, bidirectional communication, ensuring low-latency data exchange.
 - FastAPI: Built on FastAPI, providing a high-performance, easy-to-use web framework with automatic interactive API documentation.
+
+## Demo ![demo](demo.png)
